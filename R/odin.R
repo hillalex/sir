@@ -129,7 +129,7 @@ sir_stochastic_ <- R6::R6Class(
     cfuns = list(
       rhs_dde = "sir_stochastic_rhs_dde"),
     dll = "sir",
-    user = c("beta", "I_ini", "S_ini", "sigma"),
+    user = c("beta", "I_ini", "nsim", "S_ini", "sigma"),
 
     ## This is never called, but is used to ensure that R finds our
     ## symbols that we will use from the package; without this they

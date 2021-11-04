@@ -15,11 +15,24 @@ typedef struct sir_deterministic_internal {
 } sir_deterministic_internal;
 typedef struct sir_stochastic_internal {
   double beta;
+  int dim_I;
+  int dim_N;
+  int dim_n_IR;
+  int dim_n_SI;
+  int dim_p_SI;
+  int dim_R;
+  int dim_S;
   double I_ini;
-  double initial_I;
-  double initial_R;
-  double initial_S;
+  double *initial_I;
+  double *initial_R;
+  double *initial_S;
+  double *N;
+  double *n_IR;
+  double *n_SI;
+  int nsim;
+  int offset_variable_R;
   double p_IR;
+  double *p_SI;
   double S_ini;
   double sigma;
 } sir_stochastic_internal;
@@ -202,17 +215,31 @@ sir_stochastic_internal* sir_stochastic_get_internal(SEXP internal_p, int closed
 void sir_stochastic_finalise(SEXP internal_p) {
   sir_stochastic_internal *internal = sir_stochastic_get_internal(internal_p, 0);
   if (internal_p) {
+    Free(internal->initial_I);
+    Free(internal->initial_R);
+    Free(internal->initial_S);
+    Free(internal->N);
+    Free(internal->n_IR);
+    Free(internal->n_SI);
+    Free(internal->p_SI);
     Free(internal);
     R_ClearExternalPtr(internal_p);
   }
 }
 SEXP sir_stochastic_create(SEXP user) {
   sir_stochastic_internal *internal = (sir_stochastic_internal*) Calloc(1, sir_stochastic_internal);
-  internal->initial_R = 0;
-  internal->beta = 0.20000000000000001;
-  internal->I_ini = 1;
-  internal->S_ini = 1000;
-  internal->sigma = 0.10000000000000001;
+  internal->initial_I = NULL;
+  internal->initial_R = NULL;
+  internal->initial_S = NULL;
+  internal->N = NULL;
+  internal->n_IR = NULL;
+  internal->n_SI = NULL;
+  internal->p_SI = NULL;
+  internal->beta = NA_REAL;
+  internal->I_ini = NA_REAL;
+  internal->nsim = NA_INTEGER;
+  internal->S_ini = NA_REAL;
+  internal->sigma = NA_REAL;
   SEXP ptr = PROTECT(R_MakeExternalPtr(internal, R_NilValue, R_NilValue));
   R_RegisterCFinalizer(ptr, sir_stochastic_finalise);
   UNPROTECT(1);
@@ -229,37 +256,107 @@ void sir_stochastic_initmod_desolve(void(* odeparms) (int *, double *)) {
 }
 SEXP sir_stochastic_contents(SEXP internal_p) {
   sir_stochastic_internal *internal = sir_stochastic_get_internal(internal_p, 1);
-  SEXP contents = PROTECT(allocVector(VECSXP, 8));
+  SEXP contents = PROTECT(allocVector(VECSXP, 21));
   SET_VECTOR_ELT(contents, 0, ScalarReal(internal->beta));
-  SET_VECTOR_ELT(contents, 1, ScalarReal(internal->I_ini));
-  SET_VECTOR_ELT(contents, 2, ScalarReal(internal->initial_I));
-  SET_VECTOR_ELT(contents, 3, ScalarReal(internal->initial_R));
-  SET_VECTOR_ELT(contents, 4, ScalarReal(internal->initial_S));
-  SET_VECTOR_ELT(contents, 5, ScalarReal(internal->p_IR));
-  SET_VECTOR_ELT(contents, 6, ScalarReal(internal->S_ini));
-  SET_VECTOR_ELT(contents, 7, ScalarReal(internal->sigma));
-  SEXP nms = PROTECT(allocVector(STRSXP, 8));
+  SET_VECTOR_ELT(contents, 1, ScalarInteger(internal->dim_I));
+  SET_VECTOR_ELT(contents, 2, ScalarInteger(internal->dim_N));
+  SET_VECTOR_ELT(contents, 3, ScalarInteger(internal->dim_n_IR));
+  SET_VECTOR_ELT(contents, 4, ScalarInteger(internal->dim_n_SI));
+  SET_VECTOR_ELT(contents, 5, ScalarInteger(internal->dim_p_SI));
+  SET_VECTOR_ELT(contents, 6, ScalarInteger(internal->dim_R));
+  SET_VECTOR_ELT(contents, 7, ScalarInteger(internal->dim_S));
+  SET_VECTOR_ELT(contents, 8, ScalarReal(internal->I_ini));
+  SEXP initial_I = PROTECT(allocVector(REALSXP, internal->dim_I));
+  memcpy(REAL(initial_I), internal->initial_I, internal->dim_I * sizeof(double));
+  SET_VECTOR_ELT(contents, 9, initial_I);
+  SEXP initial_R = PROTECT(allocVector(REALSXP, internal->dim_R));
+  memcpy(REAL(initial_R), internal->initial_R, internal->dim_R * sizeof(double));
+  SET_VECTOR_ELT(contents, 10, initial_R);
+  SEXP initial_S = PROTECT(allocVector(REALSXP, internal->dim_S));
+  memcpy(REAL(initial_S), internal->initial_S, internal->dim_S * sizeof(double));
+  SET_VECTOR_ELT(contents, 11, initial_S);
+  SEXP N = PROTECT(allocVector(REALSXP, internal->dim_N));
+  memcpy(REAL(N), internal->N, internal->dim_N * sizeof(double));
+  SET_VECTOR_ELT(contents, 12, N);
+  SEXP n_IR = PROTECT(allocVector(REALSXP, internal->dim_n_IR));
+  memcpy(REAL(n_IR), internal->n_IR, internal->dim_n_IR * sizeof(double));
+  SET_VECTOR_ELT(contents, 13, n_IR);
+  SEXP n_SI = PROTECT(allocVector(REALSXP, internal->dim_n_SI));
+  memcpy(REAL(n_SI), internal->n_SI, internal->dim_n_SI * sizeof(double));
+  SET_VECTOR_ELT(contents, 14, n_SI);
+  SET_VECTOR_ELT(contents, 15, ScalarInteger(internal->nsim));
+  SET_VECTOR_ELT(contents, 16, ScalarInteger(internal->offset_variable_R));
+  SET_VECTOR_ELT(contents, 17, ScalarReal(internal->p_IR));
+  SEXP p_SI = PROTECT(allocVector(REALSXP, internal->dim_p_SI));
+  memcpy(REAL(p_SI), internal->p_SI, internal->dim_p_SI * sizeof(double));
+  SET_VECTOR_ELT(contents, 18, p_SI);
+  SET_VECTOR_ELT(contents, 19, ScalarReal(internal->S_ini));
+  SET_VECTOR_ELT(contents, 20, ScalarReal(internal->sigma));
+  SEXP nms = PROTECT(allocVector(STRSXP, 21));
   SET_STRING_ELT(nms, 0, mkChar("beta"));
-  SET_STRING_ELT(nms, 1, mkChar("I_ini"));
-  SET_STRING_ELT(nms, 2, mkChar("initial_I"));
-  SET_STRING_ELT(nms, 3, mkChar("initial_R"));
-  SET_STRING_ELT(nms, 4, mkChar("initial_S"));
-  SET_STRING_ELT(nms, 5, mkChar("p_IR"));
-  SET_STRING_ELT(nms, 6, mkChar("S_ini"));
-  SET_STRING_ELT(nms, 7, mkChar("sigma"));
+  SET_STRING_ELT(nms, 1, mkChar("dim_I"));
+  SET_STRING_ELT(nms, 2, mkChar("dim_N"));
+  SET_STRING_ELT(nms, 3, mkChar("dim_n_IR"));
+  SET_STRING_ELT(nms, 4, mkChar("dim_n_SI"));
+  SET_STRING_ELT(nms, 5, mkChar("dim_p_SI"));
+  SET_STRING_ELT(nms, 6, mkChar("dim_R"));
+  SET_STRING_ELT(nms, 7, mkChar("dim_S"));
+  SET_STRING_ELT(nms, 8, mkChar("I_ini"));
+  SET_STRING_ELT(nms, 9, mkChar("initial_I"));
+  SET_STRING_ELT(nms, 10, mkChar("initial_R"));
+  SET_STRING_ELT(nms, 11, mkChar("initial_S"));
+  SET_STRING_ELT(nms, 12, mkChar("N"));
+  SET_STRING_ELT(nms, 13, mkChar("n_IR"));
+  SET_STRING_ELT(nms, 14, mkChar("n_SI"));
+  SET_STRING_ELT(nms, 15, mkChar("nsim"));
+  SET_STRING_ELT(nms, 16, mkChar("offset_variable_R"));
+  SET_STRING_ELT(nms, 17, mkChar("p_IR"));
+  SET_STRING_ELT(nms, 18, mkChar("p_SI"));
+  SET_STRING_ELT(nms, 19, mkChar("S_ini"));
+  SET_STRING_ELT(nms, 20, mkChar("sigma"));
   setAttrib(contents, R_NamesSymbol, nms);
-  UNPROTECT(2);
+  UNPROTECT(9);
   return contents;
 }
 SEXP sir_stochastic_set_user(SEXP internal_p, SEXP user) {
   sir_stochastic_internal *internal = sir_stochastic_get_internal(internal_p, 1);
   internal->beta = user_get_scalar_double(user, "beta", internal->beta, NA_REAL, NA_REAL);
   internal->I_ini = user_get_scalar_double(user, "I_ini", internal->I_ini, NA_REAL, NA_REAL);
+  internal->nsim = user_get_scalar_int(user, "nsim", internal->nsim, NA_REAL, NA_REAL);
   internal->S_ini = user_get_scalar_double(user, "S_ini", internal->S_ini, NA_REAL, NA_REAL);
   internal->sigma = user_get_scalar_double(user, "sigma", internal->sigma, NA_REAL, NA_REAL);
-  internal->initial_I = internal->I_ini;
-  internal->initial_S = internal->S_ini;
+  internal->dim_I = internal->nsim;
+  internal->dim_N = internal->nsim;
+  internal->dim_n_IR = internal->nsim;
+  internal->dim_n_SI = internal->nsim;
+  internal->dim_p_SI = internal->nsim;
+  internal->dim_R = internal->nsim;
+  internal->dim_S = internal->nsim;
   internal->p_IR = 1 - exp(-(internal->sigma));
+  Free(internal->initial_I);
+  internal->initial_I = (double*) Calloc(internal->dim_I, double);
+  Free(internal->initial_R);
+  internal->initial_R = (double*) Calloc(internal->dim_R, double);
+  Free(internal->initial_S);
+  internal->initial_S = (double*) Calloc(internal->dim_S, double);
+  Free(internal->N);
+  internal->N = (double*) Calloc(internal->dim_N, double);
+  Free(internal->n_IR);
+  internal->n_IR = (double*) Calloc(internal->dim_n_IR, double);
+  Free(internal->n_SI);
+  internal->n_SI = (double*) Calloc(internal->dim_n_SI, double);
+  Free(internal->p_SI);
+  internal->p_SI = (double*) Calloc(internal->dim_p_SI, double);
+  for (int i = 1; i <= internal->dim_I; ++i) {
+    internal->initial_I[i - 1] = internal->I_ini;
+  }
+  for (int i = 1; i <= internal->dim_R; ++i) {
+    internal->initial_R[i - 1] = 0;
+  }
+  for (int i = 1; i <= internal->dim_S; ++i) {
+    internal->initial_S[i - 1] = internal->S_ini;
+  }
+  internal->offset_variable_R = internal->dim_I + internal->dim_S;
   return R_NilValue;
 }
 SEXP sir_stochastic_set_initial(SEXP internal_p, SEXP step_ptr, SEXP state_ptr) {
@@ -277,9 +374,9 @@ SEXP sir_stochastic_metadata(SEXP internal_p) {
   SEXP variable_length = PROTECT(allocVector(VECSXP, 3));
   SEXP variable_names = PROTECT(allocVector(STRSXP, 3));
   setAttrib(variable_length, R_NamesSymbol, variable_names);
-  SET_VECTOR_ELT(variable_length, 0, R_NilValue);
-  SET_VECTOR_ELT(variable_length, 1, R_NilValue);
-  SET_VECTOR_ELT(variable_length, 2, R_NilValue);
+  SET_VECTOR_ELT(variable_length, 0, ScalarInteger(internal->dim_S));
+  SET_VECTOR_ELT(variable_length, 1, ScalarInteger(internal->dim_I));
+  SET_VECTOR_ELT(variable_length, 2, ScalarInteger(internal->dim_R));
   SET_STRING_ELT(variable_names, 0, mkChar("S"));
   SET_STRING_ELT(variable_names, 1, mkChar("I"));
   SET_STRING_ELT(variable_names, 2, mkChar("R"));
@@ -292,25 +389,39 @@ SEXP sir_stochastic_metadata(SEXP internal_p) {
 }
 SEXP sir_stochastic_initial_conditions(SEXP internal_p, SEXP step_ptr) {
   sir_stochastic_internal *internal = sir_stochastic_get_internal(internal_p, 1);
-  SEXP r_state = PROTECT(allocVector(REALSXP, 3));
+  SEXP r_state = PROTECT(allocVector(REALSXP, internal->dim_I + internal->dim_R + internal->dim_S));
   double * state = REAL(r_state);
-  state[0] = internal->initial_S;
-  state[1] = internal->initial_I;
-  state[2] = internal->initial_R;
+  memcpy(state + 0, internal->initial_S, internal->dim_S * sizeof(double));
+  memcpy(state + internal->dim_S, internal->initial_I, internal->dim_I * sizeof(double));
+  memcpy(state + internal->offset_variable_R, internal->initial_R, internal->dim_R * sizeof(double));
   UNPROTECT(1);
   return r_state;
 }
 void sir_stochastic_rhs(sir_stochastic_internal* internal, size_t step, double * state, double * state_next, double * output) {
-  double S = state[0];
-  double I = state[1];
-  double R = state[2];
-  double N = S + I + R;
-  double n_IR = Rf_rbinom(round(I), internal->p_IR);
-  double p_SI = 1 - exp(-(internal->beta) * I / (double) N);
-  double n_SI = Rf_rbinom(round(S), p_SI);
-  state_next[2] = R + n_IR;
-  state_next[1] = I + n_SI - n_IR;
-  state_next[0] = S - n_SI;
+  double * S = state + 0;
+  double * I = state + internal->dim_S;
+  double * R = state + internal->offset_variable_R;
+  for (int i = 1; i <= internal->dim_N; ++i) {
+    internal->N[i - 1] = S[i - 1] + I[i - 1] + R[i - 1];
+  }
+  for (int i = 1; i <= internal->dim_n_IR; ++i) {
+    internal->n_IR[i - 1] = Rf_rbinom(round(I[i - 1]), internal->p_IR);
+  }
+  for (int i = 1; i <= internal->dim_p_SI; ++i) {
+    internal->p_SI[i - 1] = 1 - exp(-(internal->beta) * I[i - 1] / (double) internal->N[i - 1]);
+  }
+  for (int i = 1; i <= internal->dim_R; ++i) {
+    state_next[internal->offset_variable_R + i - 1] = R[i - 1] + internal->n_IR[i - 1];
+  }
+  for (int i = 1; i <= internal->dim_n_SI; ++i) {
+    internal->n_SI[i - 1] = Rf_rbinom(round(S[i - 1]), internal->p_SI[i - 1]);
+  }
+  for (int i = 1; i <= internal->dim_I; ++i) {
+    state_next[internal->dim_S + i - 1] = I[i - 1] + internal->n_SI[i - 1] - internal->n_IR[i - 1];
+  }
+  for (int i = 1; i <= internal->dim_S; ++i) {
+    state_next[0 + i - 1] = S[i - 1] - internal->n_SI[i - 1];
+  }
 }
 void sir_stochastic_rhs_dde(size_t n_eq, size_t step, double * state, double * state_next, size_t n_out, double * output, void * internal) {
   sir_stochastic_rhs((sir_stochastic_internal*)internal, step, state, state_next, output);
