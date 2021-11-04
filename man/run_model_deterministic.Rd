@@ -23,6 +23,8 @@ run_model_deterministic(
 \item{S_ini}{initial number susceptible}
 
 \item{I_ini}{initial number infected}
+
+\item{plot}{boolean, optionally plot results}
 }
 \description{
 runs the deterministic SIR model for given times and parameters

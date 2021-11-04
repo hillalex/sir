@@ -1,3 +1,4 @@
 exportPattern("^[[:alpha:]]+")
 useDynLib(sir)
 importFrom("odin", "odin")
+importFrom("graphics", "legend", "matlines", "matplot")

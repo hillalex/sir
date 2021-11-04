@@ -4,10 +4,20 @@
 \alias{run_model}
 \title{run stochastic SIR model}
 \usage{
-run_model(tt, beta = 0.2, sigma = 0.1, S_ini = 1000, I_ini = 1, plot = FALSE)
+run_model(
+  tt,
+  nsim = 100,
+  beta = 0.2,
+  sigma = 0.1,
+  S_ini = 1000,
+  I_ini = 1,
+  plot = FALSE
+)
 }
 \arguments{
 \item{tt}{vector of times}
+
+\item{nsim}{number of realisations to include}
 
 \item{beta}{rate of infection}
 
@@ -16,6 +26,8 @@ run_model(tt, beta = 0.2, sigma = 0.1, S_ini = 1000, I_ini = 1, plot = FALSE)
 \item{S_ini}{initial number susceptible}
 
 \item{I_ini}{initial number infected}
+
+\item{plot}{boolean, optionally plot results}
 }
 \description{
 runs the stochastic SIR model for given times and parameters

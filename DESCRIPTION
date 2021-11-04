@@ -9,6 +9,9 @@ Description: Technical test for Imperial job interview 2021
 License: MIT
 Imports:
     odin (>= 1.2.1)
+Suggests:
+    testthat,
+    mockery
 RoxygenNote: 7.1.2
 Encoding: UTF-8
 Language: en-GB
